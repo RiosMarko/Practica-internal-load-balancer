@@ -8,10 +8,6 @@ Proyecto de ejemplo que despliega:
 - **Load balancer externo**: **Traefik v2.10** para la app (puerto **8080**)
 - **Load balancer interno**: **HAProxy** para MySQL (puerto **6446**)
 
-> Objetivo: ver **balanceo** (cambia el `hostname`) y **consistencia** de datos (usuarios siempre iguales).
-
----
-
 ## Requisitos
 
 - Docker (Docker Desktop o Engine 20+)
