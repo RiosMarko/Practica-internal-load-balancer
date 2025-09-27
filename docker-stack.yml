@@ -1,0 +1,161 @@
+version: "3.9"
+
+networks:
+  public:
+    driver: overlay
+  internal:
+    driver: overlay
+    attachable: true
+
+configs:
+  haproxy_cfg_v5:
+    file: ./haproxy/haproxy.cfg
+  traefik_cfg_v2:
+    file: ./traefik/traefik.yml
+  init_sql:
+    file: ./db/init.sql
+
+volumes:
+  mysql1_data:
+  mysql2_data:
+  mysql3_data:
+  mysql4_data:
+  mysql5_data:
+
+services:
+  traefik:
+    image: traefik:v2.10
+    configs:
+      - source: traefik_cfg_v2
+        target: /etc/traefik/traefik.yml
+    ports:
+      - "8080:80"     #http://<IP>:8080/
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+    networks:
+      - public
+
+  app:
+    image: local/hostname-usuarios-app:1.0
+    environment:
+      - DB_HOST=mysql-lb
+      - DB_PORT=6446
+      - DB_USER=appuser
+      - DB_PASSWORD=apppass
+      - DB_DATABASE=appdb
+      - NODE_ENV=production
+    deploy:
+      replicas: 5
+      restart_policy:
+        condition: on-failure
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.app.rule=PathPrefix(`/`)"
+        - "traefik.http.routers.app.entrypoints=web"
+        - "traefik.http.services.app.loadbalancer.server.port=3000"
+        - "traefik.docker.network=demo_public" 
+    networks:
+      - public
+      - internal
+
+  mysql-lb:
+    image: haproxy:2.9
+    configs:
+      - source: haproxy_cfg_v5
+        target: /usr/local/etc/haproxy/haproxy.cfg
+    ports:
+      - "6446:6446"
+    deploy:
+      replicas: 1
+    networks:
+      - internal
+
+  mysql1:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpass
+    volumes:
+      - mysql1_data:/var/lib/mysql
+    configs:
+      - source: init_sql
+        target: /docker-entrypoint-initdb.d/init.sql
+        mode: 0444
+    deploy:
+      replicas: 1
+    networks:
+      - internal
+
+  mysql2:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpass
+    volumes:
+      - mysql2_data:/var/lib/mysql
+    deploy:
+      replicas: 1
+    networks:
+      - internal
+
+  mysql3:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpass
+    volumes:
+      - mysql3_data:/var/lib/mysql
+    deploy:
+      replicas: 1
+    networks:
+      - internal
+
+  mysql4:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpass
+    volumes:
+      - mysql4_data:/var/lib/mysql
+    deploy:
+      replicas: 1
+    networks:
+      - internal
+
+  mysql5:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpass
+    volumes:
+      - mysql5_data:/var/lib/mysql
+    deploy:
+      replicas: 1
+    networks:
+      - internal
+
+  mysql-app-user:
+    image: mysql:8.0
+    entrypoint:
+      - sh
+      - -c
+      - |
+        echo "Esperando a mysql1..."
+        until mysqladmin ping -hmysql1 -uroot -prootpass --silent; do
+          sleep 2
+        done
+        echo "MySQL listo, creando usuario..."
+        mysql -hmysql1 -uroot -prootpass -e "
+          CREATE USER IF NOT EXISTS 'appuser'@'%' IDENTIFIED BY 'apppass';
+          GRANT ALL PRIVILEGES ON appdb.* TO 'appuser'@'%';
+          FLUSH PRIVILEGES;
+        "
+        echo done
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        max_attempts: 6
+        delay: 5s
+    networks:
+      - internal
