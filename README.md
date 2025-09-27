@@ -10,7 +10,7 @@ Proyecto de ejemplo que despliega:
 
 ## Requisitos
 
-- Docker (Docker Desktop o Engine 20+)
+- Docker (Docker Desktop)
 - **Swarm inicializado**:
   ```bash
   docker swarm init
