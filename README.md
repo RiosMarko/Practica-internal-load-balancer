@@ -1,4 +1,3 @@
-Proyecto de ejemplo que despliega:
 
 - **App Node/Express** (5 réplicas) que expone:
   - `GET /` → JSON con `hostname` + usuarios (desde MySQL)
